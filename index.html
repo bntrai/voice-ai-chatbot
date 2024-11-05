@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice-Enabled AI Chatbot</title>
+</head>
+<body>
+    <h1>Voice-Enabled AI Chatbot</h1>
+
+    <script>
+        // Existing chatbot setup
+        window.chabotid = 203;
+        window.widgetButtonBackgroundColor = "undefined";
+        window.chatbotWidgetImage = "";
+        var s = document.createElement("script");
+        s.type = "text/javascript";
+        s.async = true;
+        s.src = "https://backend.bntr.ai/GetChatbotWidget/?chatbot_id=" + window.chabotid;
+        document.head.appendChild(s);
+
+        // Voice Integration
+        document.addEventListener("DOMContentLoaded", function () {
+            let voiceButton = document.createElement("button");
+            voiceButton.innerText = "🎙️ Talk to Chatbot";
+            voiceButton.style.position = "fixed";
+            voiceButton.style.bottom = "20px";
+            voiceButton.style.right = "20px";
+            voiceButton.style.padding = "10px";
+            voiceButton.style.backgroundColor = "#007bff";
+            voiceButton.style.color = "white";
+            voiceButton.style.border = "none";
+            voiceButton.style.borderRadius = "5px";
+            document.body.appendChild(voiceButton);
+
+            let mediaRecorder;
+            let audioChunks = [];
+            let isRecording = false;
+
+            // Event Listener for Voice Button
+            voiceButton.addEventListener("click", function () {
+                if (!isRecording) {
+                    startRecording();
+                } else {
+                    stopRecording();
+                }
+            });
+
+            // Start Recording Audio
+            function startRecording() {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        mediaRecorder = new MediaRecorder(stream);
+                        mediaRecorder.start();
+                        isRecording = true;
+                        voiceButton.innerText = "🛑 Stop Talking";
+
+                        mediaRecorder.ondataavailable = event => {
+                            audioChunks.push(event.data);
+                        };
+
+                        mediaRecorder.onstop = () => {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            audioChunks = [];
+                            sendAudioToBackend(audioBlob);
+                        };
+                    })
+                    .catch(error => {
+                        console.error("Could not access microphone:", error);
+                    });
+            }
+
+            // Stop Recording Audio
+            function stopRecording() {
+                if (mediaRecorder) {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    voiceButton.innerText = "🎙️ Talk to Chatbot";
+                }
+            }
+
+            // Send Audio Blob to Backend Server
+            function sendAudioToBackend(audioBlob) {
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = function () {
+                    const base64data = reader.result.split(',')[1];
+
+                    fetch('http://localhost:3000/api/voice', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ audioBase64: base64data })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.text) {
+                            console.log("Chatbot Response:", data.text);
+                            // Speak the response using Speech Synthesis
+                            speakResponse(data.text);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                };
+            }
+
+            // Use Speech Synthesis to speak the chatbot's response
+            function speakResponse(responseText) {
+                let synth = window.speechSynthesis;
+                if (synth) {
+                    let utterThis = new SpeechSynthesisUtterance(responseText);
+                    synth.speak(utterThis);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
